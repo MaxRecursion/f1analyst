@@ -1,0 +1,12 @@
+{
+  "name": "f1analyst-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen": "node tools/gen-demo-data.mjs",
+    "prep": "tools/prep-duckdb-wasm-toolchain.sh"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "^1.5.5-r.3"
+  }
+}

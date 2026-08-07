@@ -1,0 +1,298 @@
+@* Shared assessment page. Every arm hosts this same component, so what leadership
+   sees is identical apart from which IQueryEngine was injected. *@
+@using Demo.Shared
+@inject IQueryEngine Engine
+@inject IJSRuntime Js
+@implements IAsyncDisposable
+
+<div class="assess">
+
+  <header>
+    <h1>1,000,000 rows · local query engine assessment</h1>
+    <div class="engine">
+      <strong>@Engine.Name</strong>
+      <span class="topology">@Engine.Topology</span>
+      <span class="badges">
+        <span class="badge @(Engine.RunsOffUiThread ? "good" : "bad")">
+          @(Engine.RunsOffUiThread ? "runs off UI thread" : "runs ON the UI thread")
+        </span>
+        <span class="badge @(Engine.SupportsCancellation ? "good" : "bad")">
+          @(Engine.SupportsCancellation ? "cancellable" : "not cancellable")
+        </span>
+      </span>
+    </div>
+  </header>
+
+  @* The heartbeat is the honest broker of this whole demo. It is driven by
+     requestAnimationFrame, so it can only advance when the browser is free to paint.
+     A frozen bar means a frozen application — no matter what the timings claim. *@
+  <section class="heartbeat">
+    <label>UI responsiveness <span class="hint">(spins only while the browser can paint)</span></label>
+    <div class="hb-track"><div class="hb-dot" id="hb-dot"></div></div>
+    <div class="hb-stats">
+      <span>longest freeze: <b class="@(LongestBlockMs > 250 ? "bad" : "good")">@LongestBlockMs.ToString("N0") ms</b></span>
+      <span>dropped frames: <b class="@(DroppedFrames > 15 ? "bad" : "good")">@DroppedFrames</b></span>
+    </div>
+  </section>
+
+  <section class="controls">
+    @foreach (var q in DemoQueries.All)
+    {
+      <button class="@(Current?.Id == q.Id ? "sel" : "")"
+              disabled="@Busy"
+              @onclick="() => RunAsync(q)">@q.Title</button>
+    }
+    <button class="cancel" disabled="@(!Busy)" @onclick="Cancel">Cancel</button>
+  </section>
+
+  @if (Current is not null)
+  {
+    <p class="desc">@Current.Description</p>
+  }
+
+  @if (Status is not null)
+  {
+    <p class="status">@Status</p>
+  }
+
+  @if (Timings is not null)
+  {
+    <section class="timings">
+      <h2>Where the time went</h2>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th class="num">ms</th><th class="bar"></th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          @foreach (var t in Timings.Timings)
+          {
+            <tr>
+              <td>@Describe(t.Stage)</td>
+              <td class="num">@t.Milliseconds.ToString("N1")</td>
+              <td class="bar">
+                <div class="fill @StageClass(t.Stage)"
+                     style="width:@((t.Milliseconds / Math.Max(Timings.TotalMs, 1) * 100).ToString("F1"))%"></div>
+              </td>
+              <td class="detail">@t.Detail</td>
+            </tr>
+          }
+          <tr class="total">
+            <td>Total</td>
+            <td class="num">@Timings.TotalMs.ToString("N1")</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  }
+
+  @if (Result is { RowCount: > 0 })
+  {
+    <section class="widgets">
+      <div class="widget">
+        <h2>Chart</h2>
+        <div id="chart" class="chart"></div>
+      </div>
+
+      <div class="widget">
+        <h2>Grid <span class="hint">@Result.RowCount.ToString("N0") rows</span></h2>
+        <div class="grid-wrap">
+          <table class="grid">
+            <thead>
+              <tr>@foreach (var c in Result.Columns) { <th>@c.Name</th> }</tr>
+            </thead>
+            <tbody>
+              @* Virtualize keeps the DOM at ~40 rows regardless of result size.
+                 Cells are inlined markup, never components: at ~0.06ms per component
+                 instance a componentised viewport costs ~60ms per render. *@
+              <Virtualize Items="RowIndices" ItemSize="28" Context="row" OverscanCount="4">
+                <tr>
+                  @foreach (var c in Result.Columns)
+                  {
+                    <td class="@(IsNumeric(c) ? "num" : "")">@c.Format(row)</td>
+                  }
+                </tr>
+              </Virtualize>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  }
+</div>
+
+@code {
+    private QuerySpec? Current;
+    private QueryResult? Result;
+    private StageRecorder? Timings;
+    private string? Status;
+    private bool Busy;
+    private double LongestBlockMs;
+    private int DroppedFrames;
+
+    private CancellationTokenSource? _cts;
+    private IJSObjectReference? _host;
+    private DotNetObjectReference<Assessment>? _self;
+
+    private ICollection<int> RowIndices =>
+        Result is null ? Array.Empty<int>() : new RangeCollection(Result.RowCount);
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+        _host = await Js.InvokeAsync<IJSObjectReference>("import", "./demo-host.js");
+        _self = DotNetObjectReference.Create(this);
+        await _host.InvokeVoidAsync("startHeartbeat", _self, "hb-dot");
+
+        Status = "Bringing the engine up…";
+        StateHasChanged();
+
+        var boot = new StageRecorder();
+        await Engine.InitializeAsync(boot, new Progress<string>(m => { Status = m; StateHasChanged(); }));
+        await Engine.AttachDatasetAsync("data/demo.parquet", boot);
+        Timings = boot;
+        Status = $"Ready — dataset attached in {boot[Stage.DataAttach]:N0} ms. Pick a query.";
+        StateHasChanged();
+    }
+
+    /// <summary>Reported by the rAF heartbeat in JS; the UI thread cannot measure its own freeze.</summary>
+    [JSInvokable]
+    public void ReportHeartbeat(double longestBlockMs, int droppedFrames)
+    {
+        LongestBlockMs = longestBlockMs;
+        DroppedFrames = droppedFrames;
+        StateHasChanged();
+    }
+
+    private async Task RunAsync(QuerySpec spec)
+    {
+        Current = spec;
+        Busy = true;
+        Status = "Running…";
+        Result = null;
+        var timings = new StageRecorder();
+        Timings = timings;
+
+        _cts = new CancellationTokenSource();
+        await (_host?.InvokeVoidAsync("resetHeartbeat").AsTask() ?? Task.CompletedTask);
+        StateHasChanged();
+        await Task.Yield();   // let the "Running…" state paint before we block anything
+
+        try
+        {
+            Result = await Engine.ExecuteAsync(spec, timings, _cts.Token);
+
+            // Bind + paint are measured from .NET so the cost of getting pixels on the
+            // screen is attributed, not hidden. A fast query that renders slowly is
+            // still a slow application.
+            var bindStart = Stopwatch.GetTimestamp();
+            StateHasChanged();
+            await Task.Yield();
+            timings.Record(Stage.Bind, Stopwatch.GetElapsedTime(bindStart).TotalMilliseconds,
+                           $"{Result.RowCount:N0} rows into widgets");
+
+            if (_host is not null && Result.RowCount > 0)
+            {
+                var chartStart = Stopwatch.GetTimestamp();
+                await _host.InvokeVoidAsync("drawChart", "chart", BuildChartSeries(Result));
+                timings.Record(Stage.ChartPaint, Stopwatch.GetElapsedTime(chartStart).TotalMilliseconds);
+            }
+
+            timings.LongestUiBlockMs = LongestBlockMs;
+            timings.DroppedFrames = DroppedFrames;
+            Status = $"Done — {Result.RowCount:N0} rows in {timings.TotalMs:N0} ms total.";
+        }
+        catch (OperationCanceledException)
+        {
+            Status = "Cancelled.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed: {ex.Message}";
+        }
+        finally
+        {
+            Busy = false;
+            _cts?.Dispose();
+            _cts = null;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => _cts?.Cancel();
+
+    /// <summary>First numeric column against the first non-numeric one — enough for the demo.</summary>
+    private static ChartSeries BuildChartSeries(QueryResult r)
+    {
+        var label = r.Columns.FirstOrDefault(c => c.Type is ColumnType.String)
+                    ?? r.Columns[0];
+        var value = r.Columns.FirstOrDefault(c => c.Type is ColumnType.Decimal or ColumnType.Double or ColumnType.Int64)
+                    ?? r.Columns[^1];
+
+        // Downsample before it ever reaches the chart library: ECharts manages ~9.7 FPS
+        // at 100k raw points, uPlot far more, but neither is a reason to ship 50k points
+        // into a 900px-wide canvas.
+        const int MaxPoints = 2000;
+        var step = Math.Max(1, r.RowCount / MaxPoints);
+        var n = (r.RowCount + step - 1) / step;
+
+        var labels = new string[n];
+        var values = new double[n];
+        for (int i = 0, j = 0; i < r.RowCount && j < n; i += step, j++)
+        {
+            labels[j] = label.Format(i);
+            values[j] = value.ToDouble(i);
+        }
+        return new ChartSeries(value.Name, labels, values, r.RowCount > n);
+    }
+
+    private static bool IsNumeric(ResultColumn c) =>
+        c.Type is ColumnType.Int32 or ColumnType.Int64 or ColumnType.Double or ColumnType.Decimal;
+
+    private static string Describe(Stage s) => s switch
+    {
+        Stage.EngineInit => "Engine init",
+        Stage.DataAttach => "Attach dataset",
+        Stage.QueryExecute => "Query execute (engine)",
+        Stage.ResultTransfer => "Result transfer (boundary)",
+        Stage.Decode => "Decode into .NET",
+        Stage.Bind => "Bind to widgets",
+        Stage.GridPaint => "Grid paint",
+        Stage.ChartPaint => "Chart paint",
+        _ => s.ToString(),
+    };
+
+    private static string StageClass(Stage s) => s switch
+    {
+        Stage.QueryExecute => "engine",
+        Stage.ResultTransfer or Stage.Decode => "boundary",
+        _ => "render",
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_host is not null)
+        {
+            try { await _host.InvokeVoidAsync("stopHeartbeat"); } catch { /* page tearing down */ }
+            await _host.DisposeAsync();
+        }
+        _self?.Dispose();
+        _cts?.Dispose();
+    }
+
+    public sealed record ChartSeries(string Name, string[] Labels, double[] Values, bool Downsampled);
+
+    /// <summary>Row indices without materialising a list of a million ints.</summary>
+    private sealed class RangeCollection(int count) : ICollection<int>
+    {
+        public int Count => count;
+        public bool IsReadOnly => true;
+        public IEnumerator<int> GetEnumerator() { for (var i = 0; i < count; i++) yield return i; }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        public bool Contains(int item) => item >= 0 && item < count;
+        public void CopyTo(int[] array, int idx) { for (var i = 0; i < count; i++) array[idx + i] = i; }
+        public void Add(int item) => throw new NotSupportedException();
+        public void Clear() => throw new NotSupportedException();
+        public bool Remove(int item) => throw new NotSupportedException();
+    }
+}

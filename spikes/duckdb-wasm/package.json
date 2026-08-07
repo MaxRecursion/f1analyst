@@ -1,0 +1,19 @@
+{
+  "name": "f1analyst-spike-duckdb-wasm",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen": "node gen-data.mjs",
+    "serve": "node serve.mjs",
+    "build": "esbuild web/spike.js --bundle --format=esm --outfile=web/spike.bundle.js",
+    "bench": "node bench-native.mjs",
+    "probe": "node probe-wasm-memory.mjs"
+  },
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "1.32.0",
+    "@duckdb/node-api": "^1.5.5-r.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}

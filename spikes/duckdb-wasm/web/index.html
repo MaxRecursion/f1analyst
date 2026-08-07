@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>F1Analyst — Spike 1: DuckDB-Wasm feasibility</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+         margin: 0; padding: 24px; max-width: 1100px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { opacity: .65; margin-bottom: 20px; font-size: 13px; }
+  button { font: inherit; padding: 7px 14px; margin: 0 8px 8px 0; cursor: pointer;
+           border: 1px solid currentColor; background: transparent; border-radius: 5px; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  #env { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px;
+         margin-bottom: 18px; padding: 12px; border: 1px solid; border-radius: 6px; opacity: .9; }
+  #env dt { opacity: .6; }
+  #log { white-space: pre-wrap; padding: 14px; border: 1px solid; border-radius: 6px;
+         min-height: 320px; overflow-x: auto; }
+  .ok   { color: #1a7f37; } .bad  { color: #cf222e; } .warn { color: #9a6700; }
+  @media (prefers-color-scheme: dark) {
+    .ok { color: #3fb950; } .bad { color: #f85149; } .warn { color: #d29922; }
+  }
+</style>
+</head>
+<body>
+  <h1>Spike 1 — DuckDB-Wasm feasibility</h1>
+  <div class="sub">
+    Measures what the plan could only estimate: real query latency in Wasm, the
+    Wasm↔native slowdown factor, OPFS behaviour, and Arrow IPC transfer cost.
+  </div>
+
+  <dl id="env"></dl>
+
+  <div>
+    <button id="btn-init">1 · Instantiate DuckDB</button>
+    <button id="btn-load" disabled>2 · Load Parquet → OPFS</button>
+    <button id="btn-bench" disabled>3 · Run benchmarks</button>
+    <button id="btn-arrow" disabled>4 · Arrow IPC transfer cost</button>
+    <button id="btn-governor" disabled>5 · Runaway query / cancel</button>
+    <button id="btn-reset">Reset OPFS</button>
+  </div>
+
+  <pre id="log"></pre>
+  <script type="module" src="./spike.bundle.js"></script>
+</body>
+</html>

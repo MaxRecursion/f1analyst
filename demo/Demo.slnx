@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Demo.ArmA.WasmWorker/Demo.ArmA.WasmWorker.csproj" />
+    <Project Path="src/Demo.Shared/Demo.Shared.csproj" />
+  </Folder>
+</Solution>

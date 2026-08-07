@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <!-- [JSImport]/[JSExport] source-generated interop emits unsafe marshalling code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <!-- Every arm is measured with the same runtime settings, or the comparison is
+         meaningless. Changing any of these changes all three at once. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <WasmEnableThreads>false</WasmEnableThreads>
+  </PropertyGroup>
+</Project>

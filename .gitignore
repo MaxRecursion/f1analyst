@@ -1,0 +1,28 @@
+# Build output
+bin/
+obj/
+*.user
+
+# Package managers
+node_modules/
+
+# Third-party toolchain: emsdk (~1.5 GB) and the DuckDB source tree (~400 MB).
+# Both are their own git repositories and must never be nested inside this one.
+# Reproduce with: demo/tools/prep-duckdb-wasm-toolchain.sh
+.toolchain/
+
+# Generated dataset — 140 MB, deterministic (setseed).
+# Reproduce with: node demo/tools/gen-demo-data.mjs 1000000
+demo/data/
+spikes/duckdb-wasm/data/
+
+# Cross-compiled DuckDB static libraries — 71 MB, and libduckdb_static.a alone is
+# 51 MB, past the size GitHub warns about.
+# Reproduce with: demo/tools/build-duckdb-static.sh
+demo/artifacts/
+
+# Bundled JS (esbuild output, derived from source)
+spikes/duckdb-wasm/web/spike.bundle.js
+
+# macOS
+.DS_Store
