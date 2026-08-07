@@ -2,6 +2,8 @@
   <Folder Name="/src/">
     <Project Path="src/Demo.ArmA.WasmWorker/Demo.ArmA.WasmWorker.csproj" />
     <Project Path="src/Demo.ArmB.InProcess/Demo.ArmB.InProcess.csproj" />
+    <Project Path="src/Demo.ArmC.Host/Demo.ArmC.Host.csproj" />
+    <Project Path="src/Demo.ArmC.Worker/Demo.ArmC.Worker.csproj" />
     <Project Path="src/Demo.Shared/Demo.Shared.csproj" />
   </Folder>
 </Solution>
