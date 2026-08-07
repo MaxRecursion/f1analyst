@@ -1,3 +1,4 @@
+@using System.Diagnostics
 @* Shared assessment page. Every arm hosts this same component, so what leadership
    sees is identical apart from which IQueryEngine was injected. *@
 @using Demo.Shared
@@ -140,7 +141,7 @@
     protected override async Task OnAfterRenderAsync(bool first)
     {
         if (!first) return;
-        _host = await Js.InvokeAsync<IJSObjectReference>("import", "./demo-host.js");
+        _host = await Js.InvokeAsync<IJSObjectReference>("import", "/demo-host.js");
         _self = DotNetObjectReference.Create(this);
         await _host.InvokeVoidAsync("startHeartbeat", _self, "hb-dot");
 

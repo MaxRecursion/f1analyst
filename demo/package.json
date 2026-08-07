@@ -7,6 +7,9 @@
     "prep": "tools/prep-duckdb-wasm-toolchain.sh"
   },
   "dependencies": {
-    "@duckdb/node-api": "^1.5.5-r.3"
+    "@duckdb/duckdb-wasm": "^1.32.0",
+    "@duckdb/node-api": "^1.5.5-r.3",
+    "apache-arrow": "^17.0.0",
+    "esbuild": "^0.28.1"
   }
 }

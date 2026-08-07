@@ -58,10 +58,10 @@ public sealed partial class DuckDbWasmEngine : IQueryEngine
         if (_initialized) return;
         progress?.Report("Instantiating duckdb-wasm in a Web Worker…");
 
-        await JSHost.ImportAsync(Module, "./duckdb-gateway.js");
+        await JSHost.ImportAsync(Module, "/duckdb-gateway.js");
         await timings.MeasureAsync(Stage.EngineInit, async () =>
         {
-            var info = await JsInitialize("_content/duckdb");
+            var info = await JsInitialize("duckdb");
             progress?.Report($"Engine ready: {info}");
         });
 
